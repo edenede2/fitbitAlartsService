@@ -36,7 +36,10 @@ with st.form(key='scheduler_form'):
     morning_scan = st.checkbox("Morning", value=False)
     noon_scan = st.checkbox("Noon", value=False)
     evening_scan = st.checkbox("Evening", value=False)
+    st.write("Note: The watch will be scanned at the selected times only.")
+    st.divider()
     ema_enable = st.checkbox("Enable EMA", value=False)
+    st.write("Note: Enabling EMA only for fibro project")
 
     # Fail threshold input
     fail_threshold = st.slider("Set fail threshold (1-5):", min_value=1, max_value=5, value=3)
