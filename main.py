@@ -44,6 +44,12 @@ with st.form(key='scheduler_form'):
     # Fail threshold input
     fail_threshold = st.slider("Set fail threshold (1-5):", min_value=1, max_value=5, value=3)
 
+    fail_threshold_ema = st.slider("Set fail threshold for EMA (1-5):", min_value=1, max_value=5, value=3)
+
+    st.divider()
+
+    reset_prev_data = st.checkbox("Reset previous data", value=False)
+
     # Submit button
     submit_button = st.form_submit_button(label='Submit')
 
@@ -77,6 +83,19 @@ if submit_button:
         df = pd.DataFrame(records)
 
         if not df.empty and selected_watch in df['watch name'].values:
+            if reset_prev_data:
+                st.warning("This watch is already registered. Resetting existing entry.")
+                # Reset the existing row
+                row_index = df.index[df['watch name'] == selected_watch].tolist()[0] + 2
+                sheet.update_cell(row_index, df.columns.get_loc("last updated") + 1, '')
+                sheet.update_cell(row_index, df.columns.get_loc("last sync") + 1, '')
+                sheet.update_cell(row_index, df.columns.get_loc("last hr value") + 1, '')
+                sheet.update_cell(row_index, df.columns.get_loc("last battery") + 1, '')
+                sheet.update_cell(row_index, df.columns.get_loc("fail count") + 1, 0)
+                sheet.update_cell(row_index, df.columns.get_loc("ema_enabled") + 1, str(ema_enable))
+                sheet.update_cell(row_index, df.columns.get_loc("fail threshold") + 1, fail_threshold)
+                sheet.update_cell(row_index, df.columns.get_loc("fail threshold ema") + 1, fail_threshold_ema)
+
             st.warning("This watch is already registered. Updating existing entry.")
 
             # Update the existing row
@@ -87,6 +106,8 @@ if submit_button:
             sheet.update_cell(row_index, df.columns.get_loc("evening_scan") + 1, str(evening_scan))
             sheet.update_cell(row_index, df.columns.get_loc("fail threshold") + 1, fail_threshold)
             sheet.update_cell(row_index, df.columns.get_loc("ema_enabled") + 1, str(ema_enable))
+            sheet.update_cell(row_index, df.columns.get_loc("fail threshold ema") + 1, fail_threshold_ema)
+            
         else:
             # Append a new row
             new_row = {
@@ -94,6 +115,7 @@ if submit_button:
                 'token': token,
                 'last updated': '',
                 'watch name': selected_watch,
+                'last sync': '',
                 'last hr value': '',
                 'last battery': '',
                 'fail count': 0,
@@ -102,6 +124,10 @@ if submit_button:
                 'evening_scan': str(evening_scan),
                 'fail threshold': fail_threshold,
                 'ema_enabled': str(ema_enable),
+                'fail threshold ema': fail_threshold_ema,
+                'fail count ema': 0,
+                'last ema time': ''
+
             }
             sheet.append_row(list(new_row.values()))
 
