@@ -38,6 +38,7 @@ with st.form(key='scheduler_form'):
     evening_scan = st.checkbox("Evening", value=False)
     st.write("Note: The watch will be scanned at the selected times only.")
     st.divider()
+    
     ema_enable = st.checkbox("Enable EMA", value=False)
     st.write("Note: Enabling EMA only for fibro project")
 
