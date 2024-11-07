@@ -26,6 +26,8 @@ with st.form(key='scheduler_form'):
     # Watch selection
     selected_watch = st.selectbox("Select your watch:", watch_names)
 
+
+
     # Email input
     email = st.text_input("Enter your email address:")
 
@@ -50,14 +52,21 @@ if submit_button:
 
         # Authenticate with Google Sheets API
         scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+
+
         credentials = Credentials.from_service_account_info(
             st.secrets["gcp_service_account"], scopes=scopes
         )
+
+
+
         client = gspread.authorize(credentials)
+
 
         # Open the Google Sheet
         spreadsheet = client.open_by_key("1jb1siFl0o7R9JsKy1gbvwshesu7Ksw2BJzNqg7Z-m1E")
         sheet = spreadsheet.sheet1
+
 
         # Check if the watch already exists in the sheet
         records = sheet.get_all_records()
