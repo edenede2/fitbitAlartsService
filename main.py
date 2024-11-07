@@ -38,7 +38,7 @@ with st.form(key='scheduler_form'):
     evening_scan = st.checkbox("Evening", value=False)
     st.write("Note: The watch will be scanned at the selected times only.")
     st.divider()
-    
+
     ema_enable = st.checkbox("Enable EMA", value=False)
     st.write("Note: Enabling EMA only for fibro project")
 
@@ -50,6 +50,8 @@ with st.form(key='scheduler_form'):
     st.divider()
 
     reset_prev_data = st.checkbox("Reset previous data", value=False)
+
+    end_date = st.date_input("End date for scheduler", value=None)
 
     # Submit button
     submit_button = st.form_submit_button(label='Submit')
@@ -96,6 +98,9 @@ if submit_button:
                 sheet.update_cell(row_index, df.columns.get_loc("ema_enabled") + 1, str(ema_enable))
                 sheet.update_cell(row_index, df.columns.get_loc("fail threshold") + 1, fail_threshold)
                 sheet.update_cell(row_index, df.columns.get_loc("fail threshold ema") + 1, fail_threshold_ema)
+                sheet.update_cell(row_index, df.columns.get_loc("fail count ema") + 1, 0)
+                sheet.update_cell(row_index, df.columns.get_loc("last ema time") + 1, '')
+                sheet.update_cell(row_index, df.columns.get_loc("finish date") + 1, end_date)
 
             st.warning("This watch is already registered. Updating existing entry.")
 
@@ -108,7 +113,7 @@ if submit_button:
             sheet.update_cell(row_index, df.columns.get_loc("fail threshold") + 1, fail_threshold)
             sheet.update_cell(row_index, df.columns.get_loc("ema_enabled") + 1, str(ema_enable))
             sheet.update_cell(row_index, df.columns.get_loc("fail threshold ema") + 1, fail_threshold_ema)
-            
+            sheet.update_cell(row_index, df.columns.get_loc("finish date") + 1, end_date)
         else:
             # Append a new row
             new_row = {
@@ -127,7 +132,8 @@ if submit_button:
                 'ema_enabled': str(ema_enable),
                 'fail threshold ema': fail_threshold_ema,
                 'fail count ema': 0,
-                'last ema time': ''
+                'last ema time': '',
+                'finish date': end_date
 
             }
             sheet.append_row(list(new_row.values()))
