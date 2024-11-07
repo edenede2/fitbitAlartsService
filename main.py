@@ -26,7 +26,7 @@ with st.form(key='scheduler_form'):
     # Watch selection
     selected_watch = st.selectbox("Select your watch:", watch_names)
 
-
+    
 
     # Email input
     email = st.text_input("Enter your email address:")
@@ -36,6 +36,7 @@ with st.form(key='scheduler_form'):
     morning_scan = st.checkbox("Morning", value=False)
     noon_scan = st.checkbox("Noon", value=False)
     evening_scan = st.checkbox("Evening", value=False)
+    ema_enable = st.checkbox("Enable EMA", value=False)
 
     # Fail threshold input
     fail_threshold = st.slider("Set fail threshold (1-5):", min_value=1, max_value=5, value=3)
@@ -82,6 +83,7 @@ if submit_button:
             sheet.update_cell(row_index, df.columns.get_loc("noon_scan") + 1, str(noon_scan))
             sheet.update_cell(row_index, df.columns.get_loc("evening_scan") + 1, str(evening_scan))
             sheet.update_cell(row_index, df.columns.get_loc("fail threshold") + 1, fail_threshold)
+            sheet.update_cell(row_index, df.columns.get_loc("ema_enabled") + 1, str(ema_enable))
         else:
             # Append a new row
             new_row = {
@@ -95,7 +97,8 @@ if submit_button:
                 'morning_scan': str(morning_scan),
                 'noon_scan': str(noon_scan),
                 'evening_scan': str(evening_scan),
-                'fail threshold': fail_threshold
+                'fail threshold': fail_threshold,
+                'ema_enabled': str(ema_enable),
             }
             sheet.append_row(list(new_row.values()))
 
