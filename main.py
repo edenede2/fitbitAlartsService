@@ -100,7 +100,7 @@ if submit_button:
                 sheet.update_cell(row_index, df.columns.get_loc("fail threshold ema") + 1, fail_threshold_ema)
                 sheet.update_cell(row_index, df.columns.get_loc("fail count ema") + 1, 0)
                 sheet.update_cell(row_index, df.columns.get_loc("last ema time") + 1, '')
-                sheet.update_cell(row_index, df.columns.get_loc("finish date") + 1, end_date)
+                sheet.update_cell(row_index, df.columns.get_loc("finish date") + 1, str(end_date))
 
             st.warning("This watch is already registered. Updating existing entry.")
 
@@ -113,7 +113,7 @@ if submit_button:
             sheet.update_cell(row_index, df.columns.get_loc("fail threshold") + 1, fail_threshold)
             sheet.update_cell(row_index, df.columns.get_loc("ema_enabled") + 1, str(ema_enable))
             sheet.update_cell(row_index, df.columns.get_loc("fail threshold ema") + 1, fail_threshold_ema)
-            sheet.update_cell(row_index, df.columns.get_loc("finish date") + 1, end_date)
+            sheet.update_cell(row_index, df.columns.get_loc("finish date") + 1, str(end_date))
         else:
             # Append a new row
             new_row = {
@@ -133,7 +133,7 @@ if submit_button:
                 'fail threshold ema': fail_threshold_ema,
                 'fail count ema': 0,
                 'last ema time': '',
-                'finish date': end_date
+                'finish date': str(end_date)
 
             }
             sheet.append_row(list(new_row.values()))
