@@ -2,9 +2,50 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
+import pymongo as pm
 
 # Set page configuration
 st.set_page_config(page_title="Fitbit Scheduler", layout="centered")
+
+
+
+
+# Define a function to select a profile
+def select_profile(name, client):
+
+    db = client['lab']
+    collection = db['labFitbits']
+
+    # find all the documents in the collection with the specified "project" 
+    try:
+        documents_fibro = collection.find({"project": "fibro"})
+        documents_nova = collection.find({"project": "nova"})
+        documents_mdma = collection.find({"project": "mdma"})
+        documents_idf = collection.find({"project": "idf"})
+    except:
+        st.error("Failed to fetch data from the database.")
+        return None
+
+    profile = None
+    if name == 'FibroAdmon':
+        profile = 'Fibro Study'
+    elif name == 'NovaAdmon':
+        profile = 'Nova Study'
+    elif name == 'MDMAStudy':
+        profile = 'mdma Study'
+    elif name == 'IDFStudy':
+        profile = 'idf'
+        
+    if profile == 'Nova Study':
+        return documents_nova
+    elif profile == 'Fibro Study':
+        return documents_fibro
+    elif profile == 'mdma Study':
+        return documents_mdma
+    elif profile == 'idf':
+        return documents_idf
+                                                    
+
 
 # Load watch names and tokens from the txt file
 @st.cache
@@ -16,11 +57,20 @@ def load_watch_tokens():
             watch_tokens[watch_name] = token
     return watch_tokens
 
+
+
+
 watch_tokens = st.secrets["watch_tokens"]
 watch_names = list(watch_tokens.keys())
 
 # Streamlit app UI
 st.title("Fitbit Scheduler Setup")
+
+
+
+if 'client' not in st.session_state:
+    st.session_state.client = pm.MongoClient('mongodb+srv://edenEldar:Eden1996@cluster0.rwebk7f.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')
+
 
 with st.form(key='scheduler_form'):
     # Watch selection
@@ -37,13 +87,14 @@ with st.form(key='scheduler_form'):
     noon_scan = st.checkbox("Noon", value=False)
     evening_scan = st.checkbox("Evening", value=False)
     st.write("Note: The watch will be scanned at the selected times only.")
+    # Fail threshold input
+    fail_threshold = st.slider("Set fail threshold (1-5):", min_value=1, max_value=5, value=3)
+
     st.divider()
 
     ema_enable = st.checkbox("Enable EMA", value=False)
     st.write("Note: Enabling EMA only for fibro project")
 
-    # Fail threshold input
-    fail_threshold = st.slider("Set fail threshold (1-5):", min_value=1, max_value=5, value=3)
 
     fail_threshold_ema = st.slider("Set fail threshold for EMA (1-5):", min_value=1, max_value=5, value=3)
 
@@ -85,11 +136,11 @@ if submit_button:
         records = sheet.get_all_records()
         df = pd.DataFrame(records)
 
-        if not df.empty and selected_watch in df['watch name'].values:
+        if not df.empty and selected_watch in df['watch name'].values and email in df['email'].values:
             if reset_prev_data:
                 st.warning("This watch is already registered. Resetting existing entry.")
                 # Reset the existing row
-                row_index = df.index[df['watch name'] == selected_watch].tolist()[0] + 2
+                row_index = df.index[df['watch name'] == selected_watch and df['email'] == email].tolist()[0] + 2
                 sheet.update_cell(row_index, df.columns.get_loc("last updated") + 1, '')
                 sheet.update_cell(row_index, df.columns.get_loc("last sync") + 1, '')
                 sheet.update_cell(row_index, df.columns.get_loc("last hr value") + 1, '')
@@ -105,7 +156,7 @@ if submit_button:
             st.warning("This watch is already registered. Updating existing entry.")
 
             # Update the existing row
-            row_index = df.index[df['watch name'] == selected_watch].tolist()[0] + 2  # +2 to account for header and 1-indexing
+            row_index = df.index[df['watch name'] == selected_watch and df['email'] == email].tolist()[0] + 2  # +2 to account for header and 1-indexing
             sheet.update_cell(row_index, df.columns.get_loc("email") + 1, email)
             sheet.update_cell(row_index, df.columns.get_loc("morning_scan") + 1, str(morning_scan))
             sheet.update_cell(row_index, df.columns.get_loc("noon_scan") + 1, str(noon_scan))
