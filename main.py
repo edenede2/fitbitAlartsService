@@ -207,7 +207,7 @@ if selected_project:
             # Display relevant columns
             display_columns = ['watch name', 'email', 'last updated', 'last sync', 
                              'last hr value', 'last battery', 'fail count', 
-                             'morning_scan', 'noon_scan', 'evening_scan']
+                             'morning_scan', 'noon_scan', 'evening_scan','finish date']
             
             st.dataframe(project_data[display_columns])
         else:
