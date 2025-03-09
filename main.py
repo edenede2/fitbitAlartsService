@@ -8,6 +8,17 @@ from collections import defaultdict
 # Set page configuration
 st.set_page_config(page_title="Fitbit Scheduler", layout="centered")
 
+def get_watches_from_mongodb(client, project):
+    """Fetch watches for specific project from MongoDB"""
+    db = client['lab']
+    collection = db['labFitbits']
+    watches = list(collection.find({"project": project.lower()}))
+    return watches
+
+def get_watch_token(watch_data):
+    """Get token from watch data"""
+    return watch_data.get('token', '')
+
 # Define a function to select a profile
 def select_profile(name, client):
 
@@ -43,28 +54,20 @@ def select_profile(name, client):
     elif profile == 'idf':
         return documents_idf
 
-# Load watch names and tokens from the txt file
-@st.cache
-def load_watch_tokens():
-    watch_tokens = {}
-    with open('watch_tokens.txt', 'r') as file:
-        for line in file:
-            watch_name, token = line.strip().split(',')
-            watch_tokens[watch_name] = token
-    return watch_tokens
-
-watch_tokens = st.secrets["watch_tokens"]
-watch_names = list(watch_tokens.keys())
-
 # Streamlit app UI
 st.title("Fitbit Scheduler Setup")
 
 if 'client' not in st.session_state:
     st.session_state.client = pm.MongoClient('mongodb+srv://edenEldar:Eden1996@cluster0.rwebk7f.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')
 
+# Add project selection before the form
+selected_project = st.selectbox("Select Project:", ["Fibro", "Nova", "MDMA", "IDF"])
+project_watches = get_watches_from_mongodb(st.session_state.client, selected_project)
+watch_names = [watch['name'] for watch in project_watches]
+
 with st.form(key='scheduler_form'):
-    # Watch selection
-    selected_watch = st.selectbox("Select your watch:", watch_names)
+    # Update watch selection to use filtered watch names
+    selected_watch = st.selectbox("Select your watch:", watch_names) if watch_names else st.error("No watches found for selected project")
 
     # Email input
     email = st.text_input("Enter your email address:")
@@ -98,81 +101,84 @@ if submit_button:
     if not email:
         st.error("Please enter your email address.")
     else:
-        # Prepare data to update the Google Sheet
-        token = watch_tokens[selected_watch]
+        # Update token retrieval
+        selected_watch_data = next((w for w in project_watches if w['name'] == selected_watch), None)
+        if selected_watch_data:
+            token = selected_watch_data['token']
+            # Prepare data to update the Google Sheet
 
-        # Authenticate with Google Sheets API
-        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+            # Authenticate with Google Sheets API
+            scopes = ["https://www.googleapis.com/auth/spreadsheets"]
 
-        credentials = Credentials.from_service_account_info(
-            st.secrets["gcp_service_account"], scopes=scopes
-        )
+            credentials = Credentials.from_service_account_info(
+                st.secrets["gcp_service_account"], scopes=scopes
+            )
 
-        client = gspread.authorize(credentials)
+            client = gspread.authorize(credentials)
 
-        # Open the Google Sheet
-        spreadsheet = client.open_by_key("1jb1siFl0o7R9JsKy1gbvwshesu7Ksw2BJzNqg7Z-m1E")
-        sheet = spreadsheet.sheet1
+            # Open the Google Sheet
+            spreadsheet = client.open_by_key("1jb1siFl0o7R9JsKy1gbvwshesu7Ksw2BJzNqg7Z-m1E")
+            sheet = spreadsheet.sheet1
 
-        # Check if the watch already exists in the sheet
-        records = sheet.get_all_records()
-        df = pd.DataFrame(records)
+            # Check if the watch already exists in the sheet
+            records = sheet.get_all_records()
+            df = pd.DataFrame(records)
 
-        if not df.empty and (selected_watch in df['watch name'].values) and (email in df['email'].values):
-            if reset_prev_data:
-                st.warning("This watch is already registered. Resetting existing entry.")
-                # Reset the existing row
-                row_index = df.index[df['watch name'] == selected_watch and df['email'] == email].tolist()[0] + 2
-                sheet.update_cell(row_index, df.columns.get_loc("last updated") + 1, '')
-                sheet.update_cell(row_index, df.columns.get_loc("last sync") + 1, '')
-                sheet.update_cell(row_index, df.columns.get_loc("last hr value") + 1, '')
-                sheet.update_cell(row_index, df.columns.get_loc("last battery") + 1, '')
-                sheet.update_cell(row_index, df.columns.get_loc("fail count") + 1, 0)
-                sheet.update_cell(row_index, df.columns.get_loc("ema_enabled") + 1, str(ema_enable))
+            if not df.empty and (selected_watch in df['watch name'].values) and (email in df['email'].values):
+                if reset_prev_data:
+                    st.warning("This watch is already registered. Resetting existing entry.")
+                    # Reset the existing row
+                    row_index = df.index[df['watch name'] == selected_watch and df['email'] == email].tolist()[0] + 2
+                    sheet.update_cell(row_index, df.columns.get_loc("last updated") + 1, '')
+                    sheet.update_cell(row_index, df.columns.get_loc("last sync") + 1, '')
+                    sheet.update_cell(row_index, df.columns.get_loc("last hr value") + 1, '')
+                    sheet.update_cell(row_index, df.columns.get_loc("last battery") + 1, '')
+                    sheet.update_cell(row_index, df.columns.get_loc("fail count") + 1, 0)
+                    sheet.update_cell(row_index, df.columns.get_loc("ema_enabled") + 1, str(ema_enable))
+                    sheet.update_cell(row_index, df.columns.get_loc("fail threshold") + 1, fail_threshold)
+                    sheet.update_cell(row_index, df.columns.get_loc("fail threshold ema") + 1, fail_threshold_ema)
+                    sheet.update_cell(row_index, df.columns.get_loc("fail count ema") + 1, 0)
+                    sheet.update_cell(row_index, df.columns.get_loc("last ema time") + 1, '')
+                    sheet.update_cell(row_index, df.columns.get_loc("finish date") + 1, str(end_date))
+
+                st.warning("This watch is already registered. Updating existing entry.")
+
+                # Update the existing row
+                st.write(df.index[(df['watch name'] == selected_watch) & (df['email'] == email)].tolist())
+
+                row_index = df.index[(df['watch name'] == selected_watch) & (df['email'] == email)].tolist()[0] + 2  # +2 to account for header and 1-indexing
+                sheet.update_cell(row_index, df.columns.get_loc("email") + 1, email)
+                sheet.update_cell(row_index, df.columns.get_loc("morning_scan") + 1, str(morning_scan))
+                sheet.update_cell(row_index, df.columns.get_loc("noon_scan") + 1, str(noon_scan))
+                sheet.update_cell(row_index, df.columns.get_loc("evening_scan") + 1, str(evening_scan))
                 sheet.update_cell(row_index, df.columns.get_loc("fail threshold") + 1, fail_threshold)
+                sheet.update_cell(row_index, df.columns.get_loc("ema_enabled") + 1, str(ema_enable))
                 sheet.update_cell(row_index, df.columns.get_loc("fail threshold ema") + 1, fail_threshold_ema)
-                sheet.update_cell(row_index, df.columns.get_loc("fail count ema") + 1, 0)
-                sheet.update_cell(row_index, df.columns.get_loc("last ema time") + 1, '')
                 sheet.update_cell(row_index, df.columns.get_loc("finish date") + 1, str(end_date))
+            else:
+                # Append a new row
+                new_row = {
+                    'email': email,
+                    'token': token,
+                    'last updated': '',
+                    'watch name': selected_watch,
+                    'last sync': '',
+                    'last hr value': '',
+                    'last battery': '',
+                    'fail count': 0,
+                    'morning_scan': str(morning_scan),
+                    'noon_scan': str(noon_scan),
+                    'evening_scan': str(evening_scan),
+                    'fail threshold': fail_threshold,
+                    'ema_enabled': str(ema_enable),
+                    'fail threshold ema': fail_threshold_ema,
+                    'fail count ema': 0,
+                    'last ema time': '',
+                    'finish date': str(end_date)
+                }
+                sheet.append_row(list(new_row.values()))
 
-            st.warning("This watch is already registered. Updating existing entry.")
-
-            # Update the existing row
-            st.write(df.index[(df['watch name'] == selected_watch) & (df['email'] == email)].tolist())
-
-            row_index = df.index[(df['watch name'] == selected_watch) & (df['email'] == email)].tolist()[0] + 2  # +2 to account for header and 1-indexing
-            sheet.update_cell(row_index, df.columns.get_loc("email") + 1, email)
-            sheet.update_cell(row_index, df.columns.get_loc("morning_scan") + 1, str(morning_scan))
-            sheet.update_cell(row_index, df.columns.get_loc("noon_scan") + 1, str(noon_scan))
-            sheet.update_cell(row_index, df.columns.get_loc("evening_scan") + 1, str(evening_scan))
-            sheet.update_cell(row_index, df.columns.get_loc("fail threshold") + 1, fail_threshold)
-            sheet.update_cell(row_index, df.columns.get_loc("ema_enabled") + 1, str(ema_enable))
-            sheet.update_cell(row_index, df.columns.get_loc("fail threshold ema") + 1, fail_threshold_ema)
-            sheet.update_cell(row_index, df.columns.get_loc("finish date") + 1, str(end_date))
-        else:
-            # Append a new row
-            new_row = {
-                'email': email,
-                'token': token,
-                'last updated': '',
-                'watch name': selected_watch,
-                'last sync': '',
-                'last hr value': '',
-                'last battery': '',
-                'fail count': 0,
-                'morning_scan': str(morning_scan),
-                'noon_scan': str(noon_scan),
-                'evening_scan': str(evening_scan),
-                'fail threshold': fail_threshold,
-                'ema_enabled': str(ema_enable),
-                'fail threshold ema': fail_threshold_ema,
-                'fail count ema': 0,
-                'last ema time': '',
-                'finish date': str(end_date)
-            }
-            sheet.append_row(list(new_row.values()))
-
-        st.success("Your preferences have been saved successfully!")
+            st.success("Your preferences have been saved successfully!")
 
 def get_watches_by_project(project_name, watch_tokens):
     project_prefix = project_name.lower()
@@ -180,14 +186,15 @@ def get_watches_by_project(project_name, watch_tokens):
 
 st.header("Scheduler Logs")
 st.write("Select a project to view logs:")
-selected_project = st.selectbox("Select a project:", ["Fibro", "Nova", "MDMA", "IDF"])
+selected_project_logs = st.selectbox("Select a project:", ["Fibro", "Nova", "MDMA", "IDF"], key="logs_project")
 
 # Add spreadsheet data display section
-if selected_project:
-    project_watches = get_watches_by_project(selected_project, watch_tokens)
+if selected_project_logs:
+    project_watches = get_watches_from_mongodb(st.session_state.client, selected_project_logs)
+    watch_names = [watch['name'] for watch in project_watches]
     
-    if project_watches:
-        st.subheader(f"{selected_project} Project Watches")
+    if watch_names:
+        st.subheader(f"{selected_project_logs} Project Watches")
         
         # Get spreadsheet data
         credentials = Credentials.from_service_account_info(
@@ -201,16 +208,15 @@ if selected_project:
         df = pd.DataFrame(records)
         
         # Filter records for the selected project
-        project_data = df[df['watch name'].isin(project_watches)]
+        project_data = df[df['watch name'].isin(watch_names)]
         
         if not project_data.empty:
-            # Display relevant columns
             display_columns = ['watch name', 'email', 'last updated', 'last sync', 
                              'last hr value', 'last battery', 'fail count', 
-                             'morning_scan', 'noon_scan', 'evening_scan','finish date']
+                             'morning_scan', 'noon_scan', 'evening_scan', 'finish date']
             
             st.dataframe(project_data[display_columns])
         else:
-            st.info(f"No registered watches found for {selected_project} project.")
+            st.info(f"No registered watches found for {selected_project_logs} project.")
     else:
-        st.info(f"No watches configured for {selected_project} project.")
+        st.info(f"No watches configured for {selected_project_logs} project.")
