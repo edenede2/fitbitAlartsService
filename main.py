@@ -136,7 +136,7 @@ if submit_button:
         records = sheet.get_all_records()
         df = pd.DataFrame(records)
 
-        if not df.empty and selected_watch in df['watch name'].values and email in df['email'].values:
+        if not df.empty and (selected_watch in df['watch name'].values) and (email in df['email'].values):
             if reset_prev_data:
                 st.warning("This watch is already registered. Resetting existing entry.")
                 # Reset the existing row
@@ -156,6 +156,7 @@ if submit_button:
             st.warning("This watch is already registered. Updating existing entry.")
 
             # Update the existing row
+            st.write(df.index[df['watch name'] == selected_watch and df['email'] == email].tolist())
             row_index = df.index[df['watch name'] == selected_watch and df['email'] == email].tolist()[0] + 2  # +2 to account for header and 1-indexing
             sheet.update_cell(row_index, df.columns.get_loc("email") + 1, email)
             sheet.update_cell(row_index, df.columns.get_loc("morning_scan") + 1, str(morning_scan))
