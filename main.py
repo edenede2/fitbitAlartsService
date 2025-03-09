@@ -156,10 +156,9 @@ if submit_button:
             st.warning("This watch is already registered. Updating existing entry.")
 
             # Update the existing row
-            # st.write(df.index[df['watch name'] == selected_watch and df['email'] == email].tolist())
-            st.write(df.index[df.all(df['watch name'] == selected_watch, df['email'] == email
-                                    )].tolist())
-            row_index = df.index[df['watch name'] == selected_watch and df['email'] == email].tolist()[0] + 2  # +2 to account for header and 1-indexing
+            st.write(df.index[(df['watch name'] == selected_watch) & (df['email'] == email)].tolist())
+
+            row_index = df.index[(df['watch name'] == selected_watch) & (df['email'] == email)].tolist()[0] + 2  # +2 to account for header and 1-indexing
             sheet.update_cell(row_index, df.columns.get_loc("email") + 1, email)
             sheet.update_cell(row_index, df.columns.get_loc("morning_scan") + 1, str(morning_scan))
             sheet.update_cell(row_index, df.columns.get_loc("noon_scan") + 1, str(noon_scan))
