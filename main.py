@@ -3,12 +3,10 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 import pymongo as pm
+from collections import defaultdict
 
 # Set page configuration
 st.set_page_config(page_title="Fitbit Scheduler", layout="centered")
-
-
-
 
 # Define a function to select a profile
 def select_profile(name, client):
@@ -44,8 +42,6 @@ def select_profile(name, client):
         return documents_mdma
     elif profile == 'idf':
         return documents_idf
-                                                    
-
 
 # Load watch names and tokens from the txt file
 @st.cache
@@ -57,26 +53,18 @@ def load_watch_tokens():
             watch_tokens[watch_name] = token
     return watch_tokens
 
-
-
-
 watch_tokens = st.secrets["watch_tokens"]
 watch_names = list(watch_tokens.keys())
 
 # Streamlit app UI
 st.title("Fitbit Scheduler Setup")
 
-
-
 if 'client' not in st.session_state:
     st.session_state.client = pm.MongoClient('mongodb+srv://edenEldar:Eden1996@cluster0.rwebk7f.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')
-
 
 with st.form(key='scheduler_form'):
     # Watch selection
     selected_watch = st.selectbox("Select your watch:", watch_names)
-
-    
 
     # Email input
     email = st.text_input("Enter your email address:")
@@ -94,7 +82,6 @@ with st.form(key='scheduler_form'):
 
     ema_enable = st.checkbox("Enable EMA", value=False)
     st.write("Note: Enabling EMA only for fibro project")
-
 
     fail_threshold_ema = st.slider("Set fail threshold for EMA (1-5):", min_value=1, max_value=5, value=3)
 
@@ -117,20 +104,15 @@ if submit_button:
         # Authenticate with Google Sheets API
         scopes = ["https://www.googleapis.com/auth/spreadsheets"]
 
-
         credentials = Credentials.from_service_account_info(
             st.secrets["gcp_service_account"], scopes=scopes
         )
 
-
-
         client = gspread.authorize(credentials)
-
 
         # Open the Google Sheet
         spreadsheet = client.open_by_key("1jb1siFl0o7R9JsKy1gbvwshesu7Ksw2BJzNqg7Z-m1E")
         sheet = spreadsheet.sheet1
-
 
         # Check if the watch already exists in the sheet
         records = sheet.get_all_records()
@@ -187,8 +169,48 @@ if submit_button:
                 'fail count ema': 0,
                 'last ema time': '',
                 'finish date': str(end_date)
-
             }
             sheet.append_row(list(new_row.values()))
 
         st.success("Your preferences have been saved successfully!")
+
+def get_watches_by_project(project_name, watch_tokens):
+    project_prefix = project_name.lower()
+    return [watch for watch in watch_tokens.keys() if watch.startswith(project_prefix)]
+
+st.header("Scheduler Logs")
+st.write("Select a project to view logs:")
+selected_project = st.selectbox("Select a project:", ["Fibro", "Nova", "MDMA", "IDF"])
+
+# Add spreadsheet data display section
+if selected_project:
+    project_watches = get_watches_by_project(selected_project, watch_tokens)
+    
+    if project_watches:
+        st.subheader(f"{selected_project} Project Watches")
+        
+        # Get spreadsheet data
+        credentials = Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"],
+            scopes=["https://www.googleapis.com/auth/spreadsheets"]
+        )
+        client = gspread.authorize(credentials)
+        spreadsheet = client.open_by_key("1jb1siFl0o7R9JsKy1gbvwshesu7Ksw2BJzNqg7Z-m1E")
+        sheet = spreadsheet.sheet1
+        records = sheet.get_all_records()
+        df = pd.DataFrame(records)
+        
+        # Filter records for the selected project
+        project_data = df[df['watch name'].isin(project_watches)]
+        
+        if not project_data.empty:
+            # Display relevant columns
+            display_columns = ['watch name', 'email', 'last updated', 'last sync', 
+                             'last hr value', 'last battery', 'fail count', 
+                             'morning_scan', 'noon_scan', 'evening_scan']
+            
+            st.dataframe(project_data[display_columns])
+        else:
+            st.info(f"No registered watches found for {selected_project} project.")
+    else:
+        st.info(f"No watches configured for {selected_project} project.")
