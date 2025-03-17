@@ -124,11 +124,16 @@ if submit_button:
             records = sheet.get_all_records()
             df = pd.DataFrame(records)
 
-            if not df.empty and (selected_watch in df['watch name'].values) and (email in df['email'].values):
+            # Find the watch in the dataframe
+            matching_rows = df.index[(df['watch name'] == selected_watch) & (df['email'] == email)].tolist()
+            
+            if not df.empty and matching_rows:
+                # Get the row index (add 2 to account for header and 1-indexing)
+                row_index = matching_rows[0] + 2
+                
                 if reset_prev_data:
                     st.warning("This watch is already registered. Resetting existing entry.")
                     # Reset the existing row
-                    row_index = df.index[df['watch name'] == selected_watch and df['email'] == email].tolist()[0] + 2
                     sheet.update_cell(row_index, df.columns.get_loc("last updated") + 1, '')
                     sheet.update_cell(row_index, df.columns.get_loc("last sync") + 1, '')
                     sheet.update_cell(row_index, df.columns.get_loc("last hr value") + 1, '')
@@ -143,10 +148,7 @@ if submit_button:
 
                 st.warning("This watch is already registered. Updating existing entry.")
 
-                # Update the existing row
-                st.write(df.index[(df['watch name'] == selected_watch) & (df['email'] == email)].tolist())
-
-                row_index = df.index[(df['watch name'] == selected_watch) & (df['email'] == email)].tolist()[0] + 2  # +2 to account for header and 1-indexing
+                # Update the existing row - don't display the indices list to avoid confusion
                 sheet.update_cell(row_index, df.columns.get_loc("email") + 1, email)
                 sheet.update_cell(row_index, df.columns.get_loc("morning_scan") + 1, str(morning_scan))
                 sheet.update_cell(row_index, df.columns.get_loc("noon_scan") + 1, str(noon_scan))
@@ -179,6 +181,8 @@ if submit_button:
                 sheet.append_row(list(new_row.values()))
 
             st.success("Your preferences have been saved successfully!")
+        else:
+            st.error("Could not find the selected watch. Please try again.")
 
 def get_watches_by_project(project_name, watch_tokens):
     project_prefix = project_name.lower()
